@@ -329,7 +329,7 @@ func (h *Handler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// If no code was given we have to initiate the provider's authorization workflow
-			url := provider.GetAuthCodeURL(stateData.ID)
+			url := provider.GetAuthenticationURL(stateData.ID)
 			http.Redirect(w, r, url, http.StatusFound)
 			return
 		}
@@ -363,14 +363,27 @@ func (h *Handler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			claims := map[string]interface{}{
+				"iss":                h.Issuer,
+				"aud":                redirect.String(),
+				"exp":                time.Now().Add(time.Hour),
+				"iat":                time.Now(),
+				"state":              ar.State,
+				"connector_id":       provider.GetID(),
+				"connector_response": session.GetExtra,
+				"connector_subject":  session.GetRemoteSubject(),
+				"redirect_uri":       pkg.JoinURL(h.HostURL, "oauth2/authorize"),
+			}
+			authToken, err := h.JWT.SignToken(claims, map[string]interface{})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Could not generate id token: %s", err), http.StatusInternalServerError)
+				return
+			}
+
 			query := redirect.Query()
-			query.Add("redirect_uri", pkg.JoinURL(h.HostURL, "oauth2/authorize"))
-			query.Add("access_token", session.GetToken().AccessToken)
-			query.Add("refresh_token", session.GetToken().RefreshToken)
-			query.Add("token_type", session.GetToken().TokenType)
-			query.Add("provider", provider.GetID())
-			query.Add("remote_subject", session.GetRemoteSubject())
+			query.Add("auth_token", authToken)
 			redirect.RawQuery = query.Encode()
+
 			log.WithFields(log.Fields{
 				"provider": provider.GetID(),
 				"subject":  session.GetRemoteSubject(),

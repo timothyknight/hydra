@@ -36,7 +36,7 @@ func TestGetID(t *testing.T) {
 }
 
 func TestGetAuthCodeURL(t *testing.T) {
-	require.NotEmpty(t, mock.GetAuthCodeURL("state"))
+	require.NotEmpty(t, mock.GetAuthenticationURL("state"))
 }
 
 func TestExchangeCode(t *testing.T) {
