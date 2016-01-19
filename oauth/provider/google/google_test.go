@@ -1,4 +1,4 @@
-package dropbox
+package google
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-var mock = &dropbox{
+var mock = &google{
 	id: "123",
 	conf: &oauth2.Config{
 		ClientID:     "client",

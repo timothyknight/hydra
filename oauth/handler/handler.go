@@ -290,13 +290,16 @@ func (h *Handler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	code := r.Form.Get("code")
 	state := r.Form.Get("state")
 	if code != "" {
-		if stateData, err := h.States.GetStateData(state); err != nil {
+		stateData, err := h.States.GetStateData(state)
+		if err != nil {
 			// Something else went wrong
-			http.Error(w, fmt.Sprintf("Could not persist state data: %s", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Could not fetch state: %s", err), http.StatusBadRequest)
 			return
-		} else {
-			r.Form = stateData.ToURLValues()
 		}
+		if stateData.IsExpired() {
+			http.Error(w, fmt.Sprintf("This session expired.", err), http.StatusBadRequest)
+		}
+		r.Form = stateData.ToURLValues()
 	}
 
 	if ar := h.server.HandleAuthorizeRequest(resp, r); ar != nil {
@@ -335,7 +338,7 @@ func (h *Handler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create a session by exchanging the code for the auth code
-		session, err := provider.Exchange(code)
+		session, err := provider.FetchSession(code)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Could not exchange access code: %s", err), http.StatusUnauthorized)
 			return
@@ -374,7 +377,7 @@ func (h *Handler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 				"connector_subject":  session.GetRemoteSubject(),
 				"redirect_uri":       pkg.JoinURL(h.HostURL, "oauth2/authorize"),
 			}
-			authToken, err := h.JWT.SignToken(claims, map[string]interface{})
+			authToken, err := h.JWT.SignToken(claims, map[string]interface{}{})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Could not generate id token: %s", err), http.StatusInternalServerError)
 				return

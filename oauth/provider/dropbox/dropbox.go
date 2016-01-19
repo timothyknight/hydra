@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"github.com/go-errors/errors"
 	. "github.com/ory-am/hydra/oauth/provider"
-	"github.com/yosssi/ace"
 	"golang.org/x/oauth2"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -53,7 +51,7 @@ func (d *dropbox) GetAuthenticationURL(state string) string {
 	return d.conf.AuthCodeURL(state)
 }
 
-func (d *dropbox) Exchange(code string) (Session, error) {
+func (d *dropbox) FetchSession(code string) (Session, error) {
 	conf := *d.conf
 	token, err := conf.Exchange(oauth2.NoContext, code)
 	if err != nil {
@@ -70,15 +68,10 @@ func (d *dropbox) Exchange(code string) (Session, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var acc Account
-	if err = json.Unmarshal(body, &acc); err != nil {
+	if err = json.NewDecoder(response.Body).Decode(&acc); err != nil {
 		return nil, err
 	}
 
@@ -103,19 +96,4 @@ func (d *dropbox) Exchange(code string) (Session, error) {
 
 func (d *dropbox) GetID() string {
 	return d.id
-}
-
-type Account struct {
-	ID          string                 `json:"account_id"`
-	Email       string                 `json:"email"`
-	Locale      string                 `json:"locale"`
-	ReferralURL string                 `json:"referral_link"`
-	IsPaired    bool                   `json:"is_paired"`
-	Type        map[string]interface{} `json:"account_type"`
-	Name        struct {
-		Given       string `json:"given_name,omitempty"`
-		Surname     string `json:"surname,omitempty"`
-		FamilyName  string `json:"familiar_name,omitempty"`
-		DisplayName string `json:"display_name,omitempty"`
-	} `json:"name"`
 }
